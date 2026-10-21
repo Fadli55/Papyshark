@@ -16,21 +16,37 @@ set WORKER_WEBUI_PORT=8081
 :: Kosongkan jika ingin Spark mendeteksi IP network secara otomatis
 set LOCAL_HOST_IP=
 
-:: 4. Path Java JDK (Otomatis prioritaskan JDK lokal dari setup.cmd atau Program Files)
+:: 4. Path Java JDK (Auto-detect menyeluruh: Portable -> Program Files -> Eclipse Adoptium)
 set "SPARK_BASE=%~dp0.."
 
+set "JAVA_HOME="
 if exist "%SPARK_BASE%\jdk-21\bin\java.exe" (
     set "JAVA_HOME=%SPARK_BASE%\jdk-21"
-) else if exist "C:\Program Files\Java\jdk-21.0.12" (
-    set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12"
-) else if exist "C:\Program Files\Java\jdk-21" (
-    set "JAVA_HOME=C:\Program Files\Java\jdk-21"
-) else if exist "C:\Program Files\Java\jdk-17" (
-    set "JAVA_HOME=C:\Program Files\Java\jdk-17"
 ) else (
-    set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12"
+    for /d %%D in ("C:\Program Files\Java\jdk-*") do (
+        if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+    )
+    if not defined JAVA_HOME (
+        for /d %%D in ("C:\Program Files\Eclipse Adoptium\jdk-*") do (
+            if exist "%%D\bin\java.exe" set "JAVA_HOME=%%D"
+        )
+    )
+    if not defined JAVA_HOME (
+        where java >nul 2>&1
+        if not errorlevel 1 (
+            for /f "delims=" %%I in ('where java') do (
+                set "JAVA_BIN_DIR=%%~dpI"
+                set "JAVA_HOME=!JAVA_BIN_DIR:~0,-5!"
+            )
+        )
+    )
 )
-set "PATH=%JAVA_HOME%\bin;%PATH%"
+
+if defined JAVA_HOME (
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+) else (
+    echo [PERINGATAN] JAVA_HOME tidak ditemukan! Pastikan sudah menjalankan setup.cmd terlebih dahulu.
+)
 
 :: 5. Path Hadoop Winutils
 set "HADOOP_HOME=%SPARK_BASE%\hadoop"
