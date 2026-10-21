@@ -1,0 +1,10 @@
+# Virtual environment Python (JANGAN DI-PUSH ke Git karena spesifik ke PC pembuat)
+env/
+__pycache__/
+*.pyc
+
+# Checkpoints Jupyter
+.ipynb_checkpoints/
+
+# Log spark & hadoop
+*.log
