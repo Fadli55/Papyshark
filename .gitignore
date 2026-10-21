@@ -1,5 +1,9 @@
-# Virtual environment Python (JANGAN DI-PUSH ke Git karena spesifik ke PC pembuat)
+# Virtual environment Python, Portable Java, Portable Python (JANGAN DI-PUSH ke Git)
 env/
+jdk-21/
+jdk21.zip
+python-portable/
+python-portable.zip
 __pycache__/
 *.pyc
 

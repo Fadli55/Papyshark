@@ -16,22 +16,23 @@ set WORKER_WEBUI_PORT=8081
 :: Kosongkan jika ingin Spark mendeteksi IP network secara otomatis
 set LOCAL_HOST_IP=
 
-:: 4. Path Java JDK
-:: Sesuaikan dengan folder JDK di masing-masing PC (JDK 17 atau 21)
-if exist "C:\Program Files\Java\jdk-21.0.12" (
+:: 4. Path Java JDK (Otomatis prioritaskan JDK lokal dari setup.cmd atau Program Files)
+set "SPARK_BASE=%~dp0.."
+
+if exist "%SPARK_BASE%\jdk-21\bin\java.exe" (
+    set "JAVA_HOME=%SPARK_BASE%\jdk-21"
+) else if exist "C:\Program Files\Java\jdk-21.0.12" (
     set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12"
 ) else if exist "C:\Program Files\Java\jdk-21" (
     set "JAVA_HOME=C:\Program Files\Java\jdk-21"
 ) else if exist "C:\Program Files\Java\jdk-17" (
     set "JAVA_HOME=C:\Program Files\Java\jdk-17"
 ) else (
-    :: Fallback jika nama foldernya beda:
     set "JAVA_HOME=C:\Program Files\Java\jdk-21.0.12"
 )
 set "PATH=%JAVA_HOME%\bin;%PATH%"
 
 :: 5. Path Hadoop Winutils
-set "SPARK_BASE=%~dp0.."
 set "HADOOP_HOME=%SPARK_BASE%\hadoop"
 set "PATH=%HADOOP_HOME%\bin;%PATH%"
 
