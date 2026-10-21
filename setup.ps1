@@ -38,7 +38,6 @@ if (-not $javaFound) {
     $jdkZip = "$SPARK_BASE\jdk21.zip"
     $jdkUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip"
     
-    # Gunakan curl.exe bawaan Windows 10/11 yang sangat stabil dan support resume download (-C -)
     $curlExe = (Get-Command curl.exe -ErrorAction SilentlyContinue)
     $downloadSuccess = $false
     
@@ -78,7 +77,6 @@ if (-not $javaFound) {
     Write-Host "[INFO] Mengekstrak Java JDK 21 (Harap tunggu)..." -ForegroundColor Cyan
     Expand-Archive -Path $jdkZip -DestinationPath $SPARK_BASE -Force
     
-    # Temukan folder hasil ekstrak (biasanya bernama jdk-21.0.5+11)
     $extractedFolder = Get-ChildItem -Path $SPARK_BASE -Directory -Filter "jdk-21*" | Where-Object { $_.Name -ne "jdk-21" } | Select-Object -First 1
     if ($extractedFolder) {
         Rename-Item -Path $extractedFolder.FullName -NewName "jdk-21" -Force
@@ -91,29 +89,62 @@ if (-not $javaFound) {
 }
 
 # ------------------------------------------------------------------
-# 2. CEK / INSTALL PYTHON 3.12
+# 2. CEK / INSTALL PYTHON (ABSOLUT VALIDATION)
 # ------------------------------------------------------------------
 Write-Host "`n[2/4] Memeriksa Python..." -ForegroundColor Yellow
+
+function Test-PythonExe($path) {
+    if (-not (Test-Path $path)) { return $false }
+    try {
+        $out = & $path -c "import sys; print(sys.version_info.major)" 2>$null
+        if ($out -eq "3") { return $true }
+    } catch {
+        return $false
+    }
+    return $false
+}
+
 $pythonExe = $null
 
-if (Get-Command python -ErrorAction SilentlyContinue) {
-    $pythonExe = (Get-Command python).Source
-} elseif (Test-Path "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe") {
-    $pythonExe = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
-} elseif (Test-Path "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe") {
-    $pythonExe = "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe"
+# 1. Cek dari command python jika bukan alias WindowsApps
+$systemPy = (Get-Command python -ErrorAction SilentlyContinue)
+if ($systemPy -and ($systemPy.Source -notmatch "WindowsApps")) {
+    if (Test-PythonExe $systemPy.Source) {
+        $pythonExe = $systemPy.Source
+    }
+}
+
+# 2. Cek direktori umum instalasi Python di Windows
+if (-not $pythonExe) {
+    $commonPaths = @(
+        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python311\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python310\python.exe",
+        "C:\Python312\python.exe",
+        "C:\Python311\python.exe",
+        "C:\Python310\python.exe",
+        "$env:ProgramFiles\Python312\python.exe",
+        "$env:ProgramFiles\Python311\python.exe"
+    )
+    foreach ($p in $commonPaths) {
+        if (Test-PythonExe $p) {
+            $pythonExe = $p
+            break
+        }
+    }
 }
 
 if ($pythonExe) {
-    Write-Host "[OK] Python terdeteksi: $pythonExe" -ForegroundColor Green
+    Write-Host "[OK] Python valid terdeteksi: $pythonExe" -ForegroundColor Green
     & $pythonExe --version
 } else {
-    Write-Host "[INFO] Python tidak terdeteksi. Mengunduh installer resmi Python 3.12..." -ForegroundColor Cyan
+    Write-Host "[INFO] Python asli tidak terdeteksi. Mengunduh installer resmi Python 3.12..." -ForegroundColor Cyan
     $pyInstaller = "$SPARK_BASE\python-installer.exe"
     $pyUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
     
     $pySuccess = $false
     if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        Write-Host "Mengunduh Python via curl..."
         & curl.exe -L -C - --retry 5 --retry-delay 3 -o "$pyInstaller" "$pyUrl"
         if ($LASTEXITCODE -eq 0 -and (Test-Path $pyInstaller)) {
             $pySuccess = $true
@@ -123,14 +154,14 @@ if ($pythonExe) {
     if (-not $pySuccess) {
         for ($i = 1; $i -le 5; $i++) {
             try {
-                Write-Host "Percobaan download Python ke-$i..."
+                Write-Host "Percobaan ke-$i..."
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
                 $wc = New-Object System.Net.WebClient
                 $wc.DownloadFile($pyUrl, $pyInstaller)
                 $pySuccess = $true
                 break
             } catch {
-                Write-Host "Koneksi terputus: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
+                Write-Host "Gagal: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
                 Start-Sleep -Seconds 3
             }
         }
@@ -142,12 +173,19 @@ if ($pythonExe) {
         exit 1
     }
 
-    Write-Host "[INFO] Menginstall Python 3.12 secara otomatis..." -ForegroundColor Cyan
+    Write-Host "[INFO] Menginstall Python 3.12 secara otomatis (Harap tunggu)..." -ForegroundColor Cyan
     Start-Process -FilePath $pyInstaller -ArgumentList "/quiet InstallAllUsers=0 PrependPath=1 Include_pip=1 Include_test=0" -Wait
     Remove-Item -Path $pyInstaller -Force
     
     $pythonExe = "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe"
-    Write-Host "[OK] Python berhasil dipasang!" -ForegroundColor Green
+    if (-not (Test-PythonExe $pythonExe)) {
+        Write-Host "[ERROR] Python selesai diinstall tetapi file python.exe tidak ditemukan di $pythonExe" -ForegroundColor Red
+        Write-Host "Silakan download dan install Python manual dari: https://www.python.org/downloads/" -ForegroundColor Yellow
+        Write-Host "Jangan lupa centang 'Add python.exe to PATH'!" -ForegroundColor Yellow
+        Read-Host "Tekan Enter untuk keluar"
+        exit 1
+    }
+    Write-Host "[OK] Python 3.12 berhasil dipasang!" -ForegroundColor Green
 }
 
 # ------------------------------------------------------------------
@@ -155,19 +193,33 @@ if ($pythonExe) {
 # ------------------------------------------------------------------
 Write-Host "`n[3/4] Menyiapkan Virtual Environment Python (env)..." -ForegroundColor Yellow
 $venvDir = "$SPARK_BASE\env"
+$pyVenvExe = "$venvDir\Scripts\python.exe"
+
+# Hapus folder env jika korup/kosong tanpa python.exe
+if ((Test-Path $venvDir) -and (-not (Test-Path $pyVenvExe))) {
+    Write-Host "[INFO] Menemukan folder env rusak / tidak lengkap. Membersihkan..." -ForegroundColor Cyan
+    Remove-Item -Path $venvDir -Recurse -Force
+}
+
 if (-not (Test-Path $venvDir)) {
     Write-Host "[INFO] Membuat virtual environment di $venvDir..." -ForegroundColor Cyan
     & $pythonExe -m venv $venvDir
-} else {
-    Write-Host "[OK] Environment 'env' sudah tersedia." -ForegroundColor Green
 }
+
+if (-not (Test-Path $pyVenvExe)) {
+    Write-Host "[ERROR] Gagal membuat virtual environment di $venvDir!" -ForegroundColor Red
+    Write-Host "Pastikan antivirus tidak memblokir pembuatan file script." -ForegroundColor Yellow
+    Read-Host "Tekan Enter untuk keluar"
+    exit 1
+}
+
+Write-Host "[OK] Environment 'env' siap digunakan!" -ForegroundColor Green
 
 # ------------------------------------------------------------------
 # 4. INSTALL DEPENDENCIES (PYSPARK, JUPYTER, PANDAS)
 # ------------------------------------------------------------------
 Write-Host "`n[4/4] Menginstall PySpark, Jupyter, dan dependensi (Anti-Timeout)..." -ForegroundColor Yellow
 $pipExe = "$venvDir\Scripts\pip.exe"
-$pyVenvExe = "$venvDir\Scripts\python.exe"
 
 & $pyVenvExe -m pip install --upgrade pip --default-timeout=1000 --retries 10
 & $pipExe install -r "$SPARK_BASE\requirements.txt" --default-timeout=1000 --retries 10
