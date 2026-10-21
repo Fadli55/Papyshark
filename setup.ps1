@@ -32,40 +32,58 @@ if (Test-Path "$SPARK_BASE\jdk-21\bin\java.exe") {
 }
 
 if (-not $javaFound) {
-    Write-Host "`n[INFO] Java tidak terdeteksi. Mengunduh OpenJDK 21 Portable (~190 MB)..." -ForegroundColor Cyan
-    Write-Host "Dilengkapi fitur Auto-Retry tahan koneksi lemot..."
+    Write-Host "`n[INFO] Java tidak terdeteksi. Mengunduh Adoptium Eclipse Temurin JDK 21 (~195 MB)..." -ForegroundColor Cyan
+    Write-Host "Menggunakan cURL dengan resume & retry agar stabil..."
     
     $jdkZip = "$SPARK_BASE\jdk21.zip"
-    $jdkUrl = "https://download.java.net/java/GA/jdk21.0.2/f2283984656d49e699280e63b7718c42/13/GPL/openjdk-21.0.2_windows-x64_bin.zip"
+    $jdkUrl = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip"
     
+    # Gunakan curl.exe bawaan Windows 10/11 yang sangat stabil dan support resume download (-C -)
+    $curlExe = (Get-Command curl.exe -ErrorAction SilentlyContinue)
     $downloadSuccess = $false
-    for ($i = 1; $i -le 5; $i++) {
-        try {
-            Write-Host "Mencoba download Java (Percobaan ke-$i)..."
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $wc = New-Object System.Net.WebClient
-            $wc.Headers.Add("User-Agent", "Mozilla/5.0")
-            $wc.DownloadFile($jdkUrl, $jdkZip)
+    
+    if ($curlExe) {
+        Write-Host "Mengunduh via curl.exe..."
+        & curl.exe -L -C - --retry 5 --retry-delay 3 --connect-timeout 30 -o "$jdkZip" "$jdkUrl"
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $jdkZip)) {
             $downloadSuccess = $true
-            break
-        } catch {
-            Write-Host "Koneksi terputus: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 3
+        }
+    }
+    
+    if (-not $downloadSuccess) {
+        Write-Host "Mengunduh via WebClient..."
+        for ($i = 1; $i -le 5; $i++) {
+            try {
+                Write-Host "Percobaan ke-$i..."
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                $wc = New-Object System.Net.WebClient
+                $wc.Headers.Add("User-Agent", "Mozilla/5.0")
+                $wc.DownloadFile($jdkUrl, $jdkZip)
+                $downloadSuccess = $true
+                break
+            } catch {
+                Write-Host "Gagal: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 3
+            }
         }
     }
 
-    if (-not $downloadSuccess) {
-        Write-Host "[ERROR] Gagal mendownload Java JDK. Silakan cek koneksi internet dan jalankan ulang." -ForegroundColor Red
+    if (-not $downloadSuccess -or -not (Test-Path $jdkZip)) {
+        Write-Host "[ERROR] Gagal mendownload Java JDK dari server GitHub." -ForegroundColor Red
+        Write-Host "Silakan download manual JDK 21 dari: https://adoptium.net/temurin/releases/?version=21" -ForegroundColor Yellow
         Read-Host "Tekan Enter untuk keluar"
         exit 1
     }
 
-    Write-Host "[INFO] Mengekstrak Java JDK 21..." -ForegroundColor Cyan
+    Write-Host "[INFO] Mengekstrak Java JDK 21 (Harap tunggu)..." -ForegroundColor Cyan
     Expand-Archive -Path $jdkZip -DestinationPath $SPARK_BASE -Force
     
-    if (Test-Path "$SPARK_BASE\jdk-21.0.2") {
-        Rename-Item -Path "$SPARK_BASE\jdk-21.0.2" -NewName "jdk-21" -Force
+    # Temukan folder hasil ekstrak (biasanya bernama jdk-21.0.5+11)
+    $extractedFolder = Get-ChildItem -Path $SPARK_BASE -Directory -Filter "jdk-21*" | Where-Object { $_.Name -ne "jdk-21" } | Select-Object -First 1
+    if ($extractedFolder) {
+        Rename-Item -Path $extractedFolder.FullName -NewName "jdk-21" -Force
     }
+    
     if (Test-Path $jdkZip) {
         Remove-Item -Path $jdkZip -Force
     }
@@ -95,17 +113,26 @@ if ($pythonExe) {
     $pyUrl = "https://www.python.org/ftp/python/3.12.7/python-3.12.7-amd64.exe"
     
     $pySuccess = $false
-    for ($i = 1; $i -le 5; $i++) {
-        try {
-            Write-Host "Mencoba download Python (Percobaan ke-$i)..."
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            $wc = New-Object System.Net.WebClient
-            $wc.DownloadFile($pyUrl, $pyInstaller)
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        & curl.exe -L -C - --retry 5 --retry-delay 3 -o "$pyInstaller" "$pyUrl"
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $pyInstaller)) {
             $pySuccess = $true
-            break
-        } catch {
-            Write-Host "Koneksi terputus: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 3
+        }
+    }
+    
+    if (-not $pySuccess) {
+        for ($i = 1; $i -le 5; $i++) {
+            try {
+                Write-Host "Percobaan download Python ke-$i..."
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                $wc = New-Object System.Net.WebClient
+                $wc.DownloadFile($pyUrl, $pyInstaller)
+                $pySuccess = $true
+                break
+            } catch {
+                Write-Host "Koneksi terputus: $($_.Exception.Message). Mengulang dalam 3 detik..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 3
+            }
         }
     }
 
