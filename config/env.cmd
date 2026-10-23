@@ -4,8 +4,8 @@
 :: ========================================================
 
 :: 1. Tentukan IP Master (Jika pakai Radmin VPN, masukkan IP Radmin milik PC Master)
-:: Contoh: set MASTER_IP=26.152.94.182
-set MASTER_IP=26.152.94.182
+:: Contoh: set MASTER_IP=26.66.202.158
+set MASTER_IP=26.66.202.158
 set MASTER_PORT=7077
 set MASTER_WEBUI_PORT=8080
 
@@ -56,7 +56,7 @@ set "PATH=%HADOOP_HOME%\bin;%PATH%"
 set "VENV_DIR=%SPARK_BASE%\env"
 set "SPARK_HOME=%VENV_DIR%\Lib\site-packages\pyspark"
 set "PATH=%VENV_DIR%\Scripts;%PATH%"
-set "PYSPARK_PYTHON=%VENV_DIR%\Scripts\python.exe"
-set "PYSPARK_DRIVER_PYTHON=%VENV_DIR%\Scripts\python.exe"
+set "PYSPARK_PYTHON=python"
+set "PYSPARK_DRIVER_PYTHON=python"
 
 echo [CONFIG] Environment Spark terkonfigurasi.
