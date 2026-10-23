@@ -4,8 +4,8 @@
 :: ========================================================
 
 :: 1. Tentukan IP Master (Jika pakai Radmin VPN, masukkan IP Radmin milik PC Master)
-:: Contoh: set MASTER_IP=26.x.x.x
-set MASTER_IP=127.0.0.1
+:: Contoh: set MASTER_IP=26.152.94.182
+set MASTER_IP=26.152.94.182
 set MASTER_PORT=7077
 set MASTER_WEBUI_PORT=8080
 
@@ -14,7 +14,7 @@ set WORKER_WEBUI_PORT=8081
 
 :: 3. IP PC ini sendiri (Opsional: jika pakai Radmin, masukkan IP Radmin PC ini)
 :: Kosongkan jika ingin Spark mendeteksi IP network secara otomatis
-set LOCAL_HOST_IP=
+set LOCAL_HOST_IP=26.152.94.182
 
 :: 4. Path Java JDK (Auto-detect menyeluruh: Portable -> Program Files -> Eclipse Adoptium)
 set "SPARK_BASE=%~dp0.."

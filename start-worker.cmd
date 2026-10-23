@@ -18,5 +18,8 @@ if not "%LOCAL_HOST_IP%"=="" (
     set HOST_ARG=--host %LOCAL_HOST_IP%
 )
 
+:: Pastikan Worker mewariskan path python lokal ke executor
+set "SPARK_EXECUTOR_OPTS=-Dspark.pyspark.python=python"
+
 call "%SPARK_HOME%\bin\spark-class2.cmd" org.apache.spark.deploy.worker.Worker %HOST_ARG% --webui-port %WORKER_WEBUI_PORT% spark://%MASTER_IP%:%MASTER_PORT%
 pause
